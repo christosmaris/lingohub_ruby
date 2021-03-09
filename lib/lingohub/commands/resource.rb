@@ -91,7 +91,8 @@ module Lingohub::Command
       files_source.each do |file_name|
         begin
           downloaded = project.download_resource(directory, file_name, locale_as_filter)
-          display("#{file_name} downloaded") if downloaded
+          display("#{file_name} downloaded -- waiting 2 seconds") if downloaded
+          sleep(2)
         rescue
           display "Error downloading #{file_name}. Response: #{$!.message || $!.response}"
         end
@@ -103,7 +104,8 @@ module Lingohub::Command
         begin
           path = File.expand_path(file_name, Dir.pwd)
           project.upload_resource(path, extract_locale_from_args, extract_strategy_parameters)
-          display("#{file_name} uploaded")
+          display("#{file_name} uploaded -- waiting 2 seconds")
+          sleep(2)
         rescue
           display "Error uploading #{file_name}. Response: #{$!.message || $!.response}"
         end
