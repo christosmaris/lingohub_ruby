@@ -22,6 +22,13 @@ module Lingohub::Command
       end
     end
 
+    def export
+      project # Project validation
+      project.initiate_export
+      project.await_export_readiness
+      project.download_and_extract_export
+    end
+
     def up
       project #project validation
       extract_locale_from_args

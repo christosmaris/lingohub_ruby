@@ -17,8 +17,9 @@ module Lingohub
         end
       end
 
-      lazy_attr_accessor(:title, :link, :weburl, :resources_url,
-                         :translations_url, :search_url, :owner, :description, :project_locales)
+      lazy_attr_accessor(:title, :link, :weburl, :resources_url, :translations_url,
+                        :exports_url, :export_id, :export_download_url,
+                        :search_url, :owner, :description, :project_locales)
 
       def initialize(client, link)
         @client = client
@@ -36,6 +37,70 @@ module Lingohub
           end
         end
         @resources
+      end
+
+      def initiate_export
+        puts "Initiating a new export"
+
+        response = @client.post(self.exports_url, "", {'content-type'=> 'application/json', 'accept'=> '*'})
+        export_id = JSON.parse(response)["id"]
+
+        puts "\tThe export id is: #{export_id}"
+        init_attributes :export_id => export_id
+      end
+
+      def await_export_readiness
+        puts "Waiting for the export to be complete"
+
+        loop.with_index { |_, counter|
+          export_info = get_export_info
+          export_status = export_info["status"]
+          puts "\t#{counter + 1}. Export Status: #{export_status}"
+
+          case export_status
+          when "PROCESSING"
+            sleep 5
+          when "SUCCESS"
+            init_attributes :export_download_url => export_info["downloadUrl"]
+            break
+          else
+            raise "The export failed with the following error: #{export_info['errorDetails']}"
+          end
+        }
+      end
+
+      def get_export_info
+        response = @client.get("#{self.exports_url}/#{self.export_id}", {'content-type'=> 'application/json', 'accept'=> '*'})
+        parsed_response = JSON.parse(response)
+
+        parsed_response
+      end
+
+      def download_and_extract_export
+        puts "Downloading and exporting the locales"
+
+        puts "\tDownloading the export file"
+        export_file = @client.get_export_file(self.export_download_url).body
+
+        puts "\tSaving the export file temporarily on disk"
+        File.open("temp.zip", "wb") { |file| file.write export_file }
+
+        puts "\tUnzipping the export file"
+        system("unzip -d temp temp.zip > /dev/null")
+
+        puts "\tMoving all new locales to their respective folders"
+        system([
+          "for file in ./temp/*; do",
+          "locale=$(echo $file | awk -F'.' '{print $3}');",
+          'destination="app/locales/${locale}";',
+          "[ -d $destination ] && mv $file $destination;",
+          "done",
+        ].join(' '))
+
+        puts "\tCleaning all temporary and irrelevant files"
+        system("rm temp.zip")
+        system("rm -fr ./temp")
+        system("git clean -qf")
       end
 
       def download_resource(directory, filename, locale_as_filter = nil)
@@ -77,6 +142,7 @@ module Lingohub
         weburl = links[1]["href"]
         translations_url = links[2]["href"]
         resources_url = links[3]["href"]
+        exports_url = link + "/exports"
         search_url = links[4]["href"]
 
         init_attributes :title => project_hash["title"], :link => link,
@@ -84,7 +150,7 @@ module Lingohub
                         :owner => project_hash["owner_email"], :description => project_hash["description"],
                         :project_locales => project_hash["project_locales"],
                         :translations_url => translations_url, :resources_url => resources_url,
-                        :search_url => search_url
+                        :exports_url => exports_url, :search_url => search_url
       end
 
       def init_attributes(attributes)

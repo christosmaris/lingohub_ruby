@@ -53,6 +53,10 @@ class Lingohub::Client
     return Lingohub::Models::Projects.new(self)
   end
 
+  def get_export_file(url)
+    RestClient.get url
+  end
+
   def get(uri, extra_headers={ }) # :nodoc:
     process(:get, uri, extra_headers)
   end
