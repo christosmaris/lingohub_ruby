@@ -91,9 +91,30 @@ module Lingohub
         puts "\tMoving all new locales to their respective folders"
         system([
           "for file in ./temp/*; do",
-          "locale=$(echo $file | awk -F'.' '{print $3}');",
-          'destination="app/locales/${locale}";',
-          "[ -d $destination ] && mv $file $destination;",
+
+            "locale=$(echo $file | awk -F'.' '{print $3}');",
+            "newfilename=$(echo $file | awk -F '/' '{print $3}');",
+
+            # Skip pt-br files
+            "if [[ $locale == 'pt-br' ]]; then",
+              "continue;",
+            "fi;",
+
+            # Rename pt files to pt-br
+            "if [[ $locale == 'pt' ]]; then",
+              "locale='pt-br';",
+              'newfilename="${newfilename/pt.yml/pt-br.yml}";',
+            "fi;",
+
+            # Move all files
+            'destination="app/locales/${locale}/${newfilename}";',
+            "[ -f $destination ] && mv $file $destination;",
+
+            # Replace the parent pt: key with pt-br:
+            "if [[ $locale == 'pt-br' ]]; then",
+              'sed -i "" "s/^pt:/pt-br:/" $destination;',
+            "fi;",
+
           "done",
         ].join(' '))
 
